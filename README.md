@@ -85,11 +85,86 @@ pd.options.display.max_columns=50
 ```
 
 ```py
+df = pd.read_csv('weatherAUS.csv', encoding='utf-8')
 
+df = df[pd.isnull(df['RainTomorrow']) == False]
+
+df = df.fillna(df.mean())
+
+df['WindGustSpeedCat'] = df['WindGustSpeed'].apply(lambda x: '0.<=40' if x <= 40 else '1.40-50' if 40 < x <= 50 else '2.>50')
+df['Humidity9amCat'] = df['Humidity9am'].apply(lambda x: '1.>60' if x > 60 else '0.<=60')
+df['Humidity3pmCat'] = df['Humidity3pm'].apply(lambda x: '1.>60' if x > 60 else '0.<=60')
+```
+
+```py
+def probs(data, child, parent1=None, parent2=None):
+    if parent1 == None:
+
+        prob = pd.crosstab(data[child], 'Empty', margins=False, normalize='columns').sort_index().to_numpy().reshape(-1).tolist()
+    elif parent1!= None:
+
+        if parent2 == None:
+            \
+            prob = pd.crosstab(data[parent1], data[child], margins=False, normalize='index').sort_index().to_numpy().reshape(-1).tolist()
+        else:
+
+            prob = pd.crosstab([data[parent1], data[parent2]], data[child], margins=False, normalize='index').sort_index().to_numpy().reshape(-1).tolist()
+    else:
+        print("Error in Probability Frequency Calculations")
+    return prob
+```
+
+```py
+H9am = BbnNode(Variable(0, "H9am", ['<=60', '>60']), probs(df, child="Humidity9amCat"))
+H3pm = BbnNode(Variable(1, "H3pm", ['<=60', '>60']), probs(df, child="Humidity3pmCat", parent1="Humidity9amCat"))
+W = BbnNode(Variable(2, "W", ['<=40', '40-50', '>50']), probs(df, child="WindGustSpeedCat"))
+RT = BbnNode(Variable(3, "RT", ['No', 'Yes']), probs(df, child="RainTomorrow", parent1="Humidity3pmCat", parent2="WindGustSpeedCat"))
+```
+
+```py
+bbn = Bbn() \
+    .add_node(H9am) \
+    .add_node(H3pm) \
+    .add_node(W) \
+    .add_node(RT) \
+    .add_edge(Edge(H9am, H3pm, EdgeType.DIRECTED)) \
+    .add_edge(Edge(H3pm, RT, EdgeType.DIRECTED)) \
+    .add_edge(Edge(W, RT, EdgeType.DIRECTED))
+```
+
+```py
+join_tree = InferenceController.apply(bbn)
+
+
+pos = {0: (-1,2), 1: (-1,0.5), 2: (1,0.5), 3: (0,-1)}
+
+options = {
+    "font_size" : 16,
+    "node_size" : 4000,
+    "node_color" : "Yellow",
+    "edgecolors" : "Red",
+    "edge_color" : "Black",
+    "linewidths" : 5,
+    "width" : 5,
+}
+```
+
+```py
+n , d = bbn.to_nx_graph()
+nx.draw(n, with_labels = True,labels = d,pos = pos , **options)
+
+ax = plt.gca()
+ax.margins(0.10)
+plt.axis("off")
+plt.show()
 ```
 
 ## Output:
-''' Show the output in the form screenshorts '''
+
+![image](https://github.com/PSriVarshan/Ex1-AAI/assets/114944059/0bf8c6ac-780a-4f07-881b-14c59417df55)
+
+
 ## Result:
-   Thus a Bayesian Network is generated using Python
+
+### Thus a Bayesian Network is generated using Python
 
